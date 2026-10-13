@@ -1,0 +1,149 @@
+/* The few patterns that belong to one screen rather than to the kit. */
+
+/* ---------- master / detail (approvals) ---------- */
+.pane-split {
+  display: grid;
+  grid-template-columns: 288px minmax(0, 1fr);
+  gap: 16px;
+  align-items: start;
+}
+@media (max-width: 940px) {
+  .pane-split {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+
+.pane-row {
+  display: block;
+  width: 100%;
+  padding: 10px 12px;
+  border: 0;
+  border-bottom: 1px solid var(--rule-soft);
+  border-left: 2px solid transparent;
+  background: transparent;
+  text-align: left;
+  cursor: pointer;
+  color: inherit;
+}
+.pane-row:last-child {
+  border-bottom: 0;
+}
+.pane-row:hover {
+  background: var(--surface-2);
+}
+.pane-row--on {
+  background: var(--sel);
+  border-left-color: var(--warn);
+}
+
+/* ---------- usage header row ---------- */
+/* Tokens need three numbers side by side; spend and sessions need one each. */
+.stat-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1.7fr) minmax(0, 1fr) minmax(0, 1fr);
+  gap: 16px;
+}
+@media (max-width: 900px) {
+  .stat-row {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+
+.token-split {
+  display: flex;
+  gap: 22px;
+  margin-top: 6px;
+}
+.token-split .tk-value {
+  display: block;
+  font-family: var(--mono);
+  font-variant-numeric: tabular-nums;
+  font-size: 24px;
+  line-height: 1.2;
+  letter-spacing: -0.02em;
+  color: var(--fg);
+}
+.token-split .tk-label {
+  display: block;
+  font-size: 11.5px;
+  color: var(--fg-muted);
+  margin-top: 2px;
+}
+
+/* ---------- numbered install steps ---------- */
+ol.numbered {
+  list-style: none;
+  counter-reset: step;
+  margin: 0;
+  padding: 0;
+}
+ol.numbered > li {
+  counter-increment: step;
+  position: relative;
+  padding: 0 0 18px 32px;
+}
+ol.numbered > li:last-child {
+  padding-bottom: 0;
+}
+ol.numbered > li::before {
+  content: counter(step);
+  position: absolute;
+  left: 0;
+  top: 0;
+  width: 21px;
+  height: 21px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 50%;
+  border: 1px solid var(--rule);
+  background: var(--surface-2);
+  font-family: var(--mono);
+  font-size: 11px;
+  color: var(--fg-muted);
+}
+ol.numbered .copyline {
+  margin: 6px 0 0;
+}
+
+/* ---------- tick list ---------- */
+ul.ticks {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+ul.ticks > li {
+  position: relative;
+  padding: 0 0 10px 22px;
+  font-size: 13px;
+  color: var(--fg-soft);
+}
+ul.ticks > li:last-child {
+  padding-bottom: 0;
+}
+ul.ticks > li::before {
+  content: "";
+  position: absolute;
+  left: 2px;
+  top: 6px;
+  width: 9px;
+  height: 5px;
+  border-left: 1.6px solid var(--allow);
+  border-bottom: 1.6px solid var(--allow);
+  transform: rotate(-45deg);
+}
+
+/* Inline code inside prose, so a path or a command reads as one. */
+code {
+  padding: 1px 4px;
+  border-radius: 3px;
+  background: var(--surface-3);
+  color: var(--fg-soft);
+  font-size: 0.9em;
+}
+.code code,
+pre code,
+.copyline code {
+  padding: 0;
+  background: none;
+}

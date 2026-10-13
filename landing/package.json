@@ -1,0 +1,27 @@
+{
+  "name": "john-landing",
+  "private": true,
+  "version": "0.1.0",
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "logos": "node scripts/build-logos.mjs",
+    "build": "vite build",
+    "build:static": "vite build && node scripts/prerender.mjs",
+    "build:single": "vite build --mode single",
+    "build:artifact": "npm run build:single && node scripts/make-artifact.mjs",
+    "preview": "vite preview",
+    "screenshots": "node scripts/console-shots.mjs"
+  },
+  "dependencies": {
+    "react": "^19.2.8",
+    "react-dom": "^19.2.8"
+  },
+  "devDependencies": {
+    "@vitejs/plugin-react": "^6.0.5",
+    "playwright-core": "^1.63.0",
+    "sharp": "^0.35.3",
+    "vite": "^8.2.1",
+    "vite-plugin-singlefile": "^2.3.3"
+  }
+}

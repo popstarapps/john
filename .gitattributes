@@ -1,0 +1,22 @@
+# Line endings, for the files where they are not cosmetic.
+#
+# Git's default on Windows is core.autocrlf=true, which rewrites every text
+# file in the working tree to CRLF on checkout. For source that is harmless.
+# For these it is not, and each one fails in a way that looks like something
+# else entirely — which is why they are named here rather than left to whoever
+# next clones this on Windows to work out.
+
+# The guest image build runs under a POSIX shell, on Linux or in WSL. A CRLF
+# script is "bad interpreter: /bin/sh^M"; a CRLF alpine.pins compares every
+# checksum against itself plus a carriage return and reports that the mirror is
+# serving something else.
+*.sh            text eol=lf
+sandbox/guest/init      text eol=lf
+sandbox/guest/alpine.pins text eol=lf
+
+# The golden terminal frames are compared byte for byte against what the
+# renderer produced, and the renderer ends its lines with LF on every platform.
+*.frame         -text
+
+# The pinned Alpine packages. Binary, whatever core.autocrlf says.
+*.apk           binary

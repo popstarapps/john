@@ -1,0 +1,50 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+
+    <title>John Console</title>
+    <meta
+      name="description"
+      content="The John web console — usage, activity, teams, policies, approvals, and administration."
+    />
+    <!-- The console is an internal, self-hosted surface. Keep it out of indexes
+         even when it is reachable from outside the network. -->
+    <meta name="robots" content="noindex, nofollow" />
+
+    <meta
+      name="theme-color"
+      content="#edf1f7"
+      media="(prefers-color-scheme: light)"
+    />
+    <meta
+      name="theme-color"
+      content="#0a1120"
+      media="(prefers-color-scheme: dark)"
+    />
+
+    <link
+      rel="icon"
+      type="image/svg+xml"
+      href="/favicon-dark.svg"
+      media="(prefers-color-scheme: dark)"
+    />
+    <link rel="icon" type="image/svg+xml" href="/favicon-light.svg" />
+
+    <!-- Applies the saved theme before first paint, so a dark-theme console
+         doesn't flash light on every navigation. Must stay inline and
+         blocking. Same storage key as the landing site, deliberately. -->
+    <script>
+      try {
+        var t = localStorage.getItem("john-theme");
+        if (t === "dark" || t === "light")
+          document.documentElement.setAttribute("data-theme", t);
+      } catch (e) {}
+    </script>
+  </head>
+  <body>
+    <div id="root"></div>
+    <script type="module" src="/src/main.tsx"></script>
+  </body>
+</html>

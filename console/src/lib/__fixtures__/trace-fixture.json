@@ -1,0 +1,15 @@
+{
+  "expectedKinds": [
+    "session.open",
+    "prompt",
+    "tool.call",
+    "assistant.message"
+  ],
+  "expectedPrompt": "fix the billing retry",
+  "file": "{\"alg\":\"chacha20poly1305\",\"keys\":[{\"for\":\"org\",\"wrapped\":\"YWdlLWVuY3J5cHRpb24ub3JnL3YxCi0+IFgyNTUxOSBHM0k1NVBKWFFmUFNORnBoeXFjd1ovRHROZWxUd0cvTFIxeHlIK3QrUEJVCnRxVVdWVGc5V3lWZVpualAzcHFoVjRod3Fzcmx3WkxTZWhhcHNHbkVxancKLS0tIGJZcmZPb0J6TVZ1SW44Q2JJNXN6MzNhYkJGeXRGcGtDTGswZ2R4REtRM2sKp33snJ9lOPN+ydaUSw1D1aPQlMMVIVQ2O1r/8Eq8RrMwayCCb1kfTJF+myLMkf8QJgLfOgpAs786du4tPgkMWw==\"},{\"for\":\"u_dev\",\"wrapped\":\"YWdlLWVuY3J5cHRpb24ub3JnL3YxCi0+IFgyNTUxOSBhd2VaVGVOZmh1dzhFZ0RES3JaVVh5TFFpWEkvcGtWNHVYNUlMSGtEOFhNCnVqRVVxck9RR1J1MWpzZ1ZlV0hzZHRYdE9Bc0JVTWRKSTBGT0hJWTJkTFkKLS0tIEozeDVIQUFFVUdITCthbXdvTVFnNHlacjdkbmRWS0U3YmU1cEwrbnlaNHcKBv8F50WNip//vK/t0I/+ckCQNqlf9eoBdas/gJoJraYV/vRmsM9AxNbJ5K9xEnXGeJFB3xKFFqJUsp6m9o8yPA==\"}],\"seq\":1,\"session\":\"s_fixture\",\"started\":\"2026-09-03T10:30:00Z\",\"v\":1}\n{\"c\":\"zqnK0bhM7wln+OCgpd6/xJpD765x/tZVUpayQPoztrviiZNbc9ZlKwSw1q930CZzMIFNOfSHET34REVtgef96xy36Y0R4bBKargf8OXwlxgOpIxmBcaId8zELjFHXTLyjB9RYYyBcAfFYDAZ/Iq0w04UVl+bGYVijf3fNbv/QmCOC62ZwS7jfDvoVhUNtvGeiPioaNE9+NrBMSNsUxuzLxOi6w==\",\"seq\":2}\n{\"c\":\"7XfdhceKJ46iSguj4b8x9RYI9QFk6nnh9uTBdg+znuAjKoSIxcXAlfTY6lpm+XJ2UlO1UzHIVehLZyMgF63w0PX1ij+jFZjoh5j/ohiGMHRJGPritKCd0TFx11U/5c21eJNFsd9AQzqbmKKALl/lbpO340NpyKnxIlsaFuFStDEwl8b4ggaj/fOt8A/Ezc8a/DiSXABM4V3l66DNmB3vVdI3PNKe7g==\",\"seq\":3}\n{\"c\":\"ctg2vniapaZuOgjry+pxaShi1ZnntCDiy2hNmAkadmKJTH2irHfh8p7qv3UJlWw+AkVFslJ5qzu5MfIrFsR22BHLdSR5KVjRGRmd+65Oqkvi9JR0agSpQK8EFA1hMTpo6+F6kw/U2cbrN7dPh50W0/HcRUW2f4VktGiSNd6u4ri2DD17iDyqDe34F3aTrepMemOhPXasK8yvhYwreEIhYMljWealAOHjP18eyAIplStXsOI2\",\"seq\":4}\n{\"c\":\"D6/nrSTiUuN4lIJIEQnWLM+avdiecg1S6BjuWoFLQw9hIoN7jBSGpYTaq8vEaYUsex7Tp8JWaW6ZSos59V6y8FtbVW77f+NpW3nT3bvFDo8Bs/gj6H+GIr0xCbs+MX/MPrOxoAO0/h99OXY8pR6/TAAAjzul8ZiFYmvfCVZaZTPMsvRUeoklqofNBmHagKQzPeb2IJWkpl2y5gJKUZUhXEn1xViWQasojGCbBPVqUbzuQe9I\",\"seq\":5}\n",
+  "note": "Written by the Go trace package. The keys here are throwaway test keys and open nothing but this blob. Both readers — trace/fixture_test.go and console/src/lib/trace.test.ts — decrypt this file, so a change to the format on one side fails on the other.",
+  "orgIdentity": "AGE-SECRET-KEY-10SHWHW5FL96VW7QMRRT2QJU0CT7VGNRFDDAXXWHDWC93JE9DVK2SJVCMF9",
+  "strangerIdentity": "AGE-SECRET-KEY-1T2MWFJSSMNXRECUTRH2S0C5WW0FVUATCWQ2MSFWJ4VA289LP6P4Q090H7W",
+  "userIdentity": "AGE-SECRET-KEY-1HXV7ZNP2CKUKQJ4HVF9G7V5SP8MRYLXN4462UT527DJK5CJWPXFSYY26GS",
+  "userRecipient": "age18ekmahg45utz28e9jrt8e2rj8zedk738ncpnhpgfxu42uxgspe9s04a8ud"
+}

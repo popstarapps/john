@@ -1,0 +1,15 @@
+
+╭─────────────────────────────────────────────────────────────────────────────────────╮
+│ APPROVAL REQUIRED  POST https://telemetry.vendor.io/v1/events ───────────────────── │
+├─────────────────────────────────────────────────────────────────────────────────────┤
+│ ask developer · policy group staging-writes                                         │
+│                                                                                     │
+│ headers                                                                             │
+│   content-type: application/json                                                    │
+│   authorization: Bearer sk-live-…redacted by policy…                                │
+│                                                                                     │
+│ body (47 bytes)                                                                     │
+│   {"project":"payments","event":"build.finished"}                                   │
+├─────────────────────────────────────────────────────────────────────────────────────┤
+│  a  allow once    r  reject                                  ←/→ choose · ⏎ confirm │
+╰─────────────────────────────────────────────────────────────────────────────────────╯

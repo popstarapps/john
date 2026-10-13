@@ -1,0 +1,15 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 920 323" width="920" height="323">
+  <title>john.</title>
+  <path d="M118.49 18.4A38 38 0 0 1 158.51 18.4L246.01 72.61A38 38 0 0 1 264 104.91L264 218.09A38 38 0 0 1 246.01 250.39L158.51 304.6A38 38 0 0 1 118.49 304.6L30.99 250.39A38 38 0 0 1 13 218.09L13 104.91A38 38 0 0 1 30.99 72.61Z" fill="none" stroke="#04193B" stroke-width="22.5" stroke-linejoin="round"/>
+  <g fill="none" stroke="#04193B" stroke-width="24.5" stroke-linecap="round" stroke-linejoin="round">
+    <path d="M417 94.5H459V190A46.5 46.5 0 0 1 368.8 205.9"/>
+    <ellipse cx="545.5" cy="189.5" rx="47.5" ry="48"/>
+    <path d="M632 95V235M632 179.5A40 38.5 0 0 1 712 179.5V235"/>
+    <path d="M758.5 156V235M758.5 182A41.25 41.25 0 0 1 841 182V235"/>
+  </g>
+  <path fill="#04193B" d="M49 116.72A10 10 0 0 1 53.93 108.1L61.18 103.84A10 10 0 0 1 70.94 103.63L132.81 136.51A10 10 0 0 0 142.19 136.51L204.06 103.63A10 10 0 0 1 213.82 103.84L221.07 108.1A10 10 0 0 1 226 116.72L226 217.33A10 10 0 0 1 221.14 225.91L142.64 272.92A10 10 0 0 1 132.36 272.92L53.86 225.91A10 10 0 0 1 49 217.33Z"/>
+  <g fill="none" stroke="#36CE29" stroke-width="12.5" stroke-linecap="round" stroke-linejoin="round">
+    <path d="M82 153L102 176L82 197M120 216H160"/>
+  </g>
+  <circle cx="900" cy="229.5" r="17" fill="#36CE29"/>
+</svg>

@@ -1,0 +1,9 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="-23 0 323 323" width="64" height="64">
+  <title>john.</title>
+  <mask id="prompt">
+    <rect width="100%" height="100%" fill="#fff"/>
+    <path d="M82 153L102 176L82 197M120 216H160" fill="none" stroke="#000" stroke-width="12.5" stroke-linecap="round" stroke-linejoin="round"/>
+  </mask>
+  <path d="M118.49 18.4A38 38 0 0 1 158.51 18.4L246.01 72.61A38 38 0 0 1 264 104.91L264 218.09A38 38 0 0 1 246.01 250.39L158.51 304.6A38 38 0 0 1 118.49 304.6L30.99 250.39A38 38 0 0 1 13 218.09L13 104.91A38 38 0 0 1 30.99 72.61Z" fill="none" stroke="#FFFFFF" stroke-width="22.5" stroke-linejoin="round"/>
+  <path fill="#FFFFFF" mask="url(#prompt)" d="M49 116.72A10 10 0 0 1 53.93 108.1L61.18 103.84A10 10 0 0 1 70.94 103.63L132.81 136.51A10 10 0 0 0 142.19 136.51L204.06 103.63A10 10 0 0 1 213.82 103.84L221.07 108.1A10 10 0 0 1 226 116.72L226 217.33A10 10 0 0 1 221.14 225.91L142.64 272.92A10 10 0 0 1 132.36 272.92L53.86 225.91A10 10 0 0 1 49 217.33Z"/>
+</svg>

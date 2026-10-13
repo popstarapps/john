@@ -1,0 +1,240 @@
+#!/bin/busybox sh
+#
+# The first thing that runs inside the sandbox. It brings up just enough of a
+# system for the agent to be the rest of it: the kernel filesystems, a shell on
+# the path so `run` has something to run commands with, and FUSE, which is how
+# the workspace gets mounted.
+#
+# Everything after this is john. The agent reads where to reach the host from
+# the kernel command line, because at this point there is no other channel it
+# could have been told on.
+
+/bin/busybox --install -s /bin
+
+mount -t proc     proc /proc
+mount -t sysfs    sys  /sys
+mount -t devtmpfs dev  /dev
+mount -t tmpfs    tmp  /tmp
+# The unified cgroup hierarchy, which is how the sandbox's process limit is
+# actually a limit. Without it the number a developer sets with /resources is
+# a number john prints back at them.
+mkdir -p /sys/fs/cgroup
+mount -t cgroup2 cgroup2 /sys/fs/cgroup 2>/dev/null ||
+	echo "john: no cgroup2 — the sandbox's process limit cannot be applied"
+
+mkdir -p /john
+
+# The sandbox's own writes live on /john, and on a real machine that is a disk
+# rather than memory. The disk is what makes the size limit real: everything
+# the sandbox installs, builds and writes and has not applied is on it, and it
+# cannot grow past what the machine was given — which is the thing a container
+# sharing the host's filesystem could never enforce.
+#
+# It arrives blank, so the first boot of a sandbox makes a filesystem on it and
+# every later boot finds one. Two things keep that first boot quick. Lazy
+# initialisation, because a hundred-gigabyte ext4 written out in full would be
+# a minute of metadata and the kernel can finish the inode tables in the
+# background as they are used. And nodiscard, because the disk is a sparse file
+# that is already empty — asking the host to punch holes through the whole of
+# it costs seconds under Virtualization.framework and buys nothing.
+#
+# A machine with no disk keeps /john in memory. That is the verification
+# harness and the loopback machine, where it is all a test needs and is gone
+# when the machine stops, as it should be.
+# Entropy first. Making a filesystem needs a UUID, and a kernel with an empty
+# random pool makes the process asking for one wait until the pool fills — on a
+# machine that has been up for a tenth of a second, that is the whole of the
+# boot spent blocked.
+for m in rng-core virtio-rng; do
+	[ -f "/lib/modules/$m.ko" ] && insmod "/lib/modules/$m.ko" 2>/dev/null
+done
+
+for m in virtio_blk scsi_common scsi_mod scsi_transport_fc hv_storvsc sd_mod crc16 mbcache jbd2 ext4 overlay; do
+	[ -f "/lib/modules/$m.ko" ] && insmod "/lib/modules/$m.ko" 2>/dev/null
+done
+
+# Which disks the machine gave us, and which is which.
+#
+# Every machine attaches them in the same order — the sandbox's own disk first,
+# the workspace's shared environment second — and that order is the only thing
+# that identifies them. What differs is how the guest can tell.
+#
+# virtio names them for the order they were attached in: vda, then vdb.
+# Hyper-V has no virtio and hands its disks over VMBus as a SCSI bus, and SCSI
+# names them for the order their probes FINISH in, which is not the order they
+# were attached in and is not stable from one boot to the next. A guest that
+# took sda for the first disk gets the environment — read-only, and shared with
+# every other sandbox in the workspace — mounted where its own writes belong,
+# about half the time. That reads as a sandbox with no environment and a disk
+# it cannot write to, which is two symptoms of something that is neither.
+#
+# So on SCSI the disks are found by the LUN the machine attached them to, which
+# sysfs records and the kernel's naming does not.
+
+# scsiblk <lun> prints the block device attached at that LUN, once it is ready.
+scsiblk() {
+	for dev in /sys/bus/scsi/devices/*:*:*:"$1"; do
+		[ -d "$dev" ] || continue
+		for blk in "$dev"/block/*; do
+			[ -e "$blk" ] || continue
+			basename "$blk"
+			return 0
+		done
+	done
+	return 1
+}
+
+# scsilun <lun> reports whether the bus scan has found a disk there at all. The
+# scan creates the device before its block device is registered, so this says
+# "a second disk is coming" while there is still nothing to mount — which is
+# what makes waiting for one safe, and makes not waiting for one that was never
+# attached free.
+scsilun() {
+	for dev in /sys/bus/scsi/devices/*:*:*:"$1"; do
+		[ -d "$dev" ] && return 0
+	done
+	return 1
+}
+
+# A SCSI bus takes a moment to finish scanning, where a virtio disk is there
+# the instant the module loads. So this waits rather than assuming, and a
+# machine with no disk at all falls out of the wait and keeps /john in memory.
+statedisk=
+envdisk=
+i=0
+while [ $i -lt 40 ]; do
+	if [ -b /dev/vda ]; then
+		statedisk=/dev/vda
+		[ -b /dev/vdb ] && envdisk=/dev/vdb
+		break
+	fi
+	if name=$(scsiblk 0); then
+		statedisk="/dev/$name"
+		break
+	fi
+	i=$((i + 1))
+	sleep 0.05
+done
+if [ -n "$statedisk" ] && [ -z "$envdisk" ] && scsilun 1; then
+	i=0
+	while [ $i -lt 40 ]; do
+		if name=$(scsiblk 1); then
+			envdisk="/dev/$name"
+			break
+		fi
+		i=$((i + 1))
+		sleep 0.05
+	done
+fi
+
+# A filesystem is made only on a disk that has none, and never on one that has
+# a filesystem this boot could not mount. That disk holds the sandbox's own
+# work, and "it would not mount, so I remade it" is how a developer loses an
+# afternoon. A disk that has one and will not open is a failure to report.
+#
+# The test is whether blkid printed anything, not what it exited with: busybox
+# reports success on a blank device it found nothing on, which would read as
+# "there is a filesystem here" and skip making one.
+if [ -n "$statedisk" ]; then
+	if [ -z "$(blkid "$statedisk" 2>/dev/null)" ]; then
+		echo "john: making a filesystem on the sandbox's disk"
+		mke2fs -q -F -t ext4 -E nodiscard,lazy_itable_init=1,lazy_journal_init=1 "$statedisk" || \
+			echo "john: could not make a filesystem on $statedisk"
+	fi
+	mount -t ext4 "$statedisk" /john || \
+		echo "john: the sandbox's disk could not be mounted; /john is memory"
+fi
+
+mkdir -p /john/upper
+
+# The workspace's environment, on a disk of its own. It is shared by every
+# sandbox in this workspace — the environment is expensive and identical for
+# all of them — so it is read-only for everyone except the one machine that is
+# building it, and a session lays a writable layer of its own over it.
+#
+# A read-only mount fails for the sandboxes that are not building, which is
+# what the second attempt is for; and a blank disk means this machine is the
+# builder and the filesystem is its to make. -F on the mkfs because a boot that
+# stops to ask "proceed anyway?" is a boot that hangs: there is nobody at the
+# other end of the guest's console to answer it.
+if [ -n "$envdisk" ]; then
+	mkdir -p /john/envbase
+	if [ -z "$(blkid "$envdisk" 2>/dev/null)" ]; then
+		echo "john: making a filesystem on the environment disk"
+		mke2fs -q -F -t ext4 -E nodiscard,lazy_itable_init=1,lazy_journal_init=1 "$envdisk" ||
+			echo "john: could not make a filesystem on $envdisk"
+	fi
+	# Writable for the one machine building the environment, read-only for
+	# every other sandbox that shares it.
+	mount -t ext4 "$envdisk" /john/envbase 2>/dev/null ||
+		mount -t ext4 -o ro "$envdisk" /john/envbase 2>/dev/null ||
+		echo "john: the environment disk could not be mounted"
+fi
+
+# FUSE is a module in most distribution kernels, and the workspace is a FUSE
+# mount, so this is not optional. Say so loudly if it fails: an agent that
+# cannot mount the workspace is one that would otherwise report an empty
+# project rather than a broken sandbox.
+if [ ! -e /dev/fuse ]; then
+	insmod /lib/modules/fuse.ko 2>/dev/null || modprobe fuse 2>/dev/null
+fi
+[ -e /dev/fuse ] || echo "john: no /dev/fuse — the workspace cannot be mounted"
+
+# The link to the host. Which transport exists depends on the machine — virtio
+# under Virtualization.framework and KVM, hv_sock under Hyper-V — so load all
+# of them and let the ones with no device present fail quietly. The agent is
+# told which to use by the address on its command line; a serial port needs
+# none of this.
+#
+# These are modules rather than built in, and a guest missing them boots
+# perfectly and then cannot reach the host, which looks like nothing at all.
+#
+# hv_sock goes first, and the order is not a preference. Linux's vsock core
+# holds exactly one guest-to-host transport, and the first module to claim it
+# keeps it: a second one is refused with EBUSY and its whole module init fails.
+# virtio's transport registers the moment it is loaded, whether or not the
+# machine has a virtio socket device — so loading it first on Hyper-V would
+# take the slot with a transport that has no device and leave hv_sock unable to
+# load at all. hv_sock is the polite one of the two: it looks for VMBus before
+# it registers anything and declines quietly where there is none, so it is safe
+# to offer it the slot first on every machine.
+for m in vsock hv_sock vmw_vsock_virtio_transport_common vmw_vsock_virtio_transport; do
+	[ -f "/lib/modules/$m.ko" ] && insmod "/lib/modules/$m.ko" 2>/dev/null
+done
+
+# Loopback, and only loopback. The sandbox has no network interface and gets
+# none — its one route out is the channel the machine gives it to the john
+# proxy, which is a socket device rather than a network. But the programs a
+# project builds with speak to a proxy at a host and a port and nothing else,
+# so the agent listens on 127.0.0.1 and carries what arrives there over that
+# channel. That needs lo up; it does not need, and must never have, anything
+# else. `ip link` inside this machine shows exactly one interface.
+ip link set lo up 2>/dev/null || ifconfig lo 127.0.0.1 up 2>/dev/null
+
+# A login shell reads these, and `run` uses a login shell so that a project's
+# environment behaves the way it does everywhere else.
+export HOME=/root
+export PATH=/bin:/sbin:/usr/bin:/usr/sbin
+mkdir -p /root /etc
+[ -f /etc/passwd ] || echo "root:x:0:0:root:/root:/bin/sh" > /etc/passwd
+[ -f /etc/group ]  || echo "root:x:0:" > /etc/group
+
+/bin/john __guest
+code=$?
+
+# The machine exists to run the agent. When it stops, so does the machine —
+# the host is told by the link closing, not by a message it has to trust.
+echo "john: agent exited with $code"
+
+# Put the disks away before the power goes. `poweroff -f` neither syncs nor
+# unmounts, and an ext4 left mounted is one the next boot has to recover —
+# the state disk holds everything the sandbox installed. The newest mount comes
+# off first, since a layer over /john holds it busy until it is gone; whatever
+# still will not let go leaves /john read-only, which is as clean.
+sync
+for mp in $(awk '$2 != "/" && $2 !~ "^/(proc|sys|dev)(/|$)" { print $2 }' /proc/mounts | sed -n '1!G;h;$p'); do
+	umount "$mp" 2>/dev/null
+done
+mount -o remount,ro /john 2>/dev/null
+sync
+poweroff -f

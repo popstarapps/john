@@ -1,0 +1,10 @@
+node_modules
+# dist/ is a build artifact (`make console`), but go:embed in embed.go needs
+# the directory to exist at compile time, so the marker file is tracked. vite
+# empties dist/ on every build and copies public/ into it, so public/.gitkeep
+# is what puts the marker back — whether the build ran through make or not.
+dist/*
+!dist/.gitkeep
+.vite
+*.local
+*.tsbuildinfo

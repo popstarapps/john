@@ -1,0 +1,46 @@
+# What the guest image is built from, exactly.
+#
+# Every developer's sandbox is meant to be the same sandbox. That is only true
+# across releases if the image is built from the same bytes every time, and
+# naming a version is not enough to get that: Alpine's branch directory holds
+# whatever the branch currently is, so a point release replaces the tarballs
+# and a package bump replaces the .apk, in place, under the same names.
+#
+# So the release is pinned, the branch path is derived from it rather than
+# following latest-stable, and everything downloaded is checked against the
+# sha256 recorded here. A mirror that serves something else stops the build
+# instead of producing an image nobody can account for.
+#
+# The packages (kind apk) are also kept, byte for byte, in apk/<arch> beside
+# this file, because the branch repository drops a package's pinned build as
+# soon as a newer one is published. The release tarballs (kind file) are not
+# kept: Alpine keeps releases/ indefinitely.
+#
+# Moving to a new Alpine is a deliberate act, and it is one command:
+#
+#     make guest-pins ALPINE=3.25.0
+#
+# which re-resolves the package closure, downloads everything for both
+# architectures and rewrites the lines below with what it actually got. Read
+# the diff — it is the changelog for the machine every tool call runs in.
+#
+# Lines are: <arch> <kind> <name> <sha256>.
+alpine 3.24.1
+branch v3.24
+
+aarch64 apk e2fsprogs-1.47.4-r0.apk 52fd401e79ce6b0ff7648733ba4de3135083cd0132543534e72106e7ea767a00
+aarch64 apk e2fsprogs-libs-1.47.4-r0.apk 52124971ae397d599aadd79263fcd68fc9e271922ccf8185b124f35fe24c60c8
+aarch64 apk libblkid-2.42.1-r0.apk 5de536dd5f80772946aebf99211695a1f4ad033568d5c9ebd0d7d1dead33de44
+aarch64 apk libcom_err-1.47.4-r0.apk a75b5955ff57046e33fc2842cfe466dc77d8e68305d5c86c6646b38a069490a2
+aarch64 apk libeconf-0.8.3-r0.apk cf0899d49ded0a6891e3cdf1b37887f2ecd77293afe1d8f3cb8937763c83f183
+aarch64 apk libuuid-2.42.1-r0.apk d2f69552b05184ba205dbc8aa0e79f8a080fcf746ec5e5e25eb89d66fbbe6db6
+aarch64 file alpine-minirootfs-3.24.1-aarch64.tar.gz f55a90f69052c5bd6f92cb09a8f47065970830b194c917a006fb94028e721259
+aarch64 file alpine-netboot-3.24.1-aarch64.tar.gz 54fe38fa41cce740ba379458ed63cfcd89ab06ae5e6a47a06dafe0a34e8427e8
+x86_64 apk e2fsprogs-1.47.4-r0.apk c7a99a18206827b09f0cfa2373e6f1db0963845ad8468a378a3b99a7e716a0e8
+x86_64 apk e2fsprogs-libs-1.47.4-r0.apk 2e067395a6981b06cfd2cd3abf0e6c6574f7ef64d02e01f75fc5323d4a337fb9
+x86_64 apk libblkid-2.42.1-r0.apk c5a5da8aa518196b613ad4654535be5fe22003253535a84e226fce055fe91e1a
+x86_64 apk libcom_err-1.47.4-r0.apk 4723d0fb8e286dc6adb54dd3cdaedcd8db54260f75ee778a5acb4c16922c0f52
+x86_64 apk libeconf-0.8.3-r0.apk 2a791c7957961f830cf31b04f35f814a63afcf633badc9052425ff1cf2f64380
+x86_64 apk libuuid-2.42.1-r0.apk e86120f2d764e9a4e1713a79fd622d815754fbfa19e525170801b174a5a18273
+x86_64 file alpine-minirootfs-3.24.1-x86_64.tar.gz 41f73e3cf5fa919b8aa5ca6b30dc48f0da2720776d7423e2a7748211456fe081
+x86_64 file alpine-netboot-3.24.1-x86_64.tar.gz 9a7769ea8fa1737b1b49d82f1bdd53d0a17338d6d3b7cfc6f2c3ec5158596d8b

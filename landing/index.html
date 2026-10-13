@@ -1,0 +1,69 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+
+    <title>John — the safe, dependable coding agent for enterprises</title>
+    <meta
+      name="description"
+      content="John is a command-line coding agent that runs each project in its own virtual machine on the developer's own machine. Every outbound request is inspected in full against central policy, and every model call goes through a gateway you host."
+    />
+
+    <!-- Link unfurls in Slack and Teams resolve og:image and canonical
+         against this. -->
+    <link rel="canonical" href="https://agentjohn.dev/" />
+
+    <meta property="og:type" content="website" />
+    <meta property="og:site_name" content="John" />
+    <meta property="og:url" content="https://agentjohn.dev/" />
+    <meta
+      property="og:title"
+      content="John — the safe, dependable coding agent for enterprises"
+    />
+    <meta
+      property="og:description"
+      content="Sandboxed execution in a virtual machine per project, whole-request egress inspection, and a self-hosted LLM gateway with redaction and routing. No vendor tenancy in the path."
+    />
+    <!-- A 1200×630 card built by scripts/build-logos.mjs. Flattened onto the
+         dark ground on purpose: unfurls composite a transparent PNG onto
+         whatever their own theme happens to be. -->
+    <meta property="og:image" content="https://agentjohn.dev/og.png" />
+    <meta property="og:image:width" content="1200" />
+    <meta property="og:image:height" content="630" />
+    <meta
+      property="og:image:alt"
+      content="John — the safe, dependable coding agent for enterprises"
+    />
+    <meta name="twitter:card" content="summary_large_image" />
+
+    <meta name="theme-color" content="#edf1f7" media="(prefers-color-scheme: light)" />
+    <meta name="theme-color" content="#0a1120" media="(prefers-color-scheme: dark)" />
+
+    <!-- The mark inverts with the browser chrome, so it stays visible in a
+         dark tab strip instead of disappearing into it. Browsers that ignore
+         `media` on an icon link fall back to the navy one, which is the
+         readable choice on the default light tab strip. -->
+    <link
+      rel="icon"
+      type="image/svg+xml"
+      href="./favicon-dark.svg"
+      media="(prefers-color-scheme: dark)"
+    />
+    <link rel="icon" type="image/svg+xml" href="./favicon-light.svg" />
+
+    <!-- Applies the visitor's saved theme before first paint, so toggling to
+         light on a dark OS doesn't flash. Must stay inline and blocking. -->
+    <script>
+      try {
+        var t = localStorage.getItem("john-theme");
+        if (t === "dark" || t === "light")
+          document.documentElement.setAttribute("data-theme", t);
+      } catch (e) {}
+    </script>
+  </head>
+  <body>
+    <div id="root"></div>
+    <script type="module" src="/src/main.jsx"></script>
+  </body>
+</html>

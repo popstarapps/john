@@ -1,0 +1,9 @@
+
+· run go test ./billing/...
+
+⠋ thinking
+  └ the 429 branch returns early instead of backing off
+
+╭─ ~/src/payments ──────────────────────────────────────────────────── sandbox ready ─╮
+│ ❯ queue a follow-up…                                                                │
+╰─ esc to interrupt ────────────────────────────────────── internal/codegen-l · 6.1k ─╯

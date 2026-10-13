@@ -1,0 +1,168 @@
+/* Tokens.
+ *
+ * The palette is the landing site's, unchanged where it exists, so the console
+ * and the marketing page are visibly the same product. What is added here is
+ * what an application needs and a brochure does not: a third surface for hover
+ * and header rows, a selection wash, a focus ring, an information hue for
+ * links and selected state, and a chart ink.
+ *
+ * Three blocks, in this order, always kept in step:
+ *   1. :root                                    — light, the default ground
+ *   2. @media (prefers-color-scheme: dark)      — only when nothing is chosen
+ *   3. :root[data-theme="dark"]                 — an explicit choice wins
+ */
+:root {
+  --bg: #edf1f7;
+  --bg-deep: #e3e9f2;
+  --surface: #ffffff;
+  --surface-2: #f6f8fc;
+  --surface-3: #eef2f9;
+  --fg: #0b1b36;
+  --fg-soft: #2b3d5e;
+  --fg-muted: #54658a;
+  --fg-faint: #8494b0;
+  --rule: #c7d2e3;
+  --rule-soft: #dde4ef;
+
+  --allow: #159b33;
+  --allow-wash: #e4f6e6;
+  /* The green a filled button sits on. Light needs a darker green than the
+     one used for text and pills, so white ink on it clears 4.5:1. */
+  --allow-solid: #0f7a28;
+  --allow-solid-ink: #ffffff;
+  --deny: #b8413a;
+  --deny-wash: #fbe8e6;
+  --warn: #a76a06;
+  --warn-wash: #fbf0dc;
+  --info: #2a5fb0;
+  --info-wash: #e4ecf9;
+
+  /* Most charts here are single-hue — identity is carried by labels. */
+  --chart-ink: #2a5fb0;
+  --chart-wash: rgba(42, 95, 176, 0.14);
+  --chart-grid: #e4e9f2;
+
+  /* The one categorical set, for the stacked spend-per-model chart. Assigned
+     in fixed slot order and never cycled; validated for colourblind
+     separation as adjacent stack segments in both themes. Three of the light
+     steps sit under 3:1 on the surface, so that chart always ships a legend
+     with values and the per-model table beside it. */
+  --series-1: #2a78d6;
+  --series-2: #eb6834;
+  --series-3: #1baf7a;
+  --series-4: #eda100;
+  --series-5: #e87ba4;
+
+  --sel: rgba(42, 95, 176, 0.1);
+  --focus: #2a5fb0;
+  --shadow-1: 0 1px 2px rgba(11, 27, 54, 0.06);
+  --shadow-2:
+    0 1px 2px rgba(11, 27, 54, 0.05), 0 12px 32px -18px rgba(11, 27, 54, 0.35);
+  --shadow-3:
+    0 2px 6px rgba(11, 27, 54, 0.08), 0 28px 64px -28px rgba(11, 27, 54, 0.45);
+  --scrim: rgba(11, 27, 54, 0.42);
+}
+
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --bg: #0a1120;
+    --bg-deep: #070d19;
+    --surface: #101a2e;
+    --surface-2: #16223a;
+    --surface-3: #1c2a46;
+    --fg: #e8eef9;
+    --fg-soft: #c2cee4;
+    --fg-muted: #8496b5;
+    --fg-faint: #61738f;
+    --rule: #253453;
+    --rule-soft: #1b2740;
+
+    --allow: #4fda57;
+    --allow-wash: #0f2a17;
+    --allow-solid: #4fda57;
+    --allow-solid-ink: #04120a;
+    --deny: #ef6f63;
+    --deny-wash: #2c1512;
+    --warn: #e0a53c;
+    --warn-wash: #2a1f0d;
+    --info: #7cb0ff;
+    --info-wash: #12243f;
+
+    --chart-ink: #7cb0ff;
+    --chart-wash: rgba(124, 176, 255, 0.16);
+    --chart-grid: #1d2942;
+
+    --series-1: #3987e5;
+    --series-2: #d95926;
+    --series-3: #199e70;
+    --series-4: #c98500;
+    --series-5: #d55181;
+
+    --sel: rgba(124, 176, 255, 0.12);
+    --focus: #7cb0ff;
+    --shadow-1: 0 1px 2px rgba(0, 0, 0, 0.4);
+    --shadow-2: 0 1px 2px rgba(0, 0, 0, 0.4), 0 14px 34px -20px rgba(0, 0, 0, 0.9);
+    --shadow-3: 0 2px 8px rgba(0, 0, 0, 0.5), 0 30px 70px -30px rgba(0, 0, 0, 1);
+    --scrim: rgba(3, 7, 15, 0.62);
+  }
+}
+
+:root[data-theme="dark"] {
+  --bg: #0a1120;
+  --bg-deep: #070d19;
+  --surface: #101a2e;
+  --surface-2: #16223a;
+  --surface-3: #1c2a46;
+  --fg: #e8eef9;
+  --fg-soft: #c2cee4;
+  --fg-muted: #8496b5;
+  --fg-faint: #61738f;
+  --rule: #253453;
+  --rule-soft: #1b2740;
+
+  --allow: #4fda57;
+  --allow-wash: #0f2a17;
+  --allow-solid: #4fda57;
+  --allow-solid-ink: #04120a;
+  --deny: #ef6f63;
+  --deny-wash: #2c1512;
+  --warn: #e0a53c;
+  --warn-wash: #2a1f0d;
+  --info: #7cb0ff;
+  --info-wash: #12243f;
+
+  --chart-ink: #7cb0ff;
+  --chart-wash: rgba(124, 176, 255, 0.16);
+  --chart-grid: #1d2942;
+
+  --series-1: #3987e5;
+  --series-2: #d95926;
+  --series-3: #199e70;
+  --series-4: #c98500;
+  --series-5: #d55181;
+
+  --sel: rgba(124, 176, 255, 0.12);
+  --focus: #7cb0ff;
+  --shadow-1: 0 1px 2px rgba(0, 0, 0, 0.4);
+  --shadow-2: 0 1px 2px rgba(0, 0, 0, 0.4), 0 14px 34px -20px rgba(0, 0, 0, 0.9);
+  --shadow-3: 0 2px 8px rgba(0, 0, 0, 0.5), 0 30px 70px -30px rgba(0, 0, 0, 1);
+  --scrim: rgba(3, 7, 15, 0.62);
+}
+
+/* ---------- type, metrics ---------- */
+:root {
+  --serif: Georgia, "Iowan Old Style", "Times New Roman", Times, serif;
+  --sans:
+    system-ui, -apple-system, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+  --mono:
+    ui-monospace, "SF Mono", SFMono-Regular, "Cascadia Mono", "Segoe UI Mono",
+    Menlo, Consolas, monospace;
+
+  --r-sm: 3px;
+  --r-md: 5px;
+  --r-lg: 8px;
+
+  --topbar-h: 52px;
+  --sidebar-w: 232px;
+  --page-max: 1320px;
+}

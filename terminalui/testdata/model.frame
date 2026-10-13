@@ -1,0 +1,12 @@
+
+╭─────────────────────────────────────────────────────────────────────────────────────╮
+│ CONTINUE ON  payments-restricted ────────────────────────────────────────────────── │
+├─────────────────────────────────────────────────────────────────────────────────────┤
+│   keyword "C++" seen in billing/native/bridge.cc                                    │
+│   this session continues on an internally hosted model                              │
+│                                                                                     │
+│ ▸ 1 internal/codegen-l · internally hosted · 128k context                           │
+│   2 internal/codegen-s · internally hosted · 32k context, faster                    │
+├─────────────────────────────────────────────────────────────────────────────────────┤
+│  ⏎  continue    esc  cancel turn                                ↑/↓ move · 1-9 pick │
+╰─────────────────────────────────────────────────────────────────────────────────────╯

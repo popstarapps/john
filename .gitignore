@@ -1,0 +1,27 @@
+backend/embedded_clients/
+build/
+sandbox/embedded_guest/
+
+# What `make release` builds and `make publish` uploads.
+/dist/
+
+# `make build` leaves the client in the root: `john` everywhere, and `john.exe`
+# on Windows, where it carries an extension.
+john
+john.exe
+
+# macOS leaves these in every directory it has been looked at in.
+.DS_Store
+
+# gokit is a dependency, pinned in go.mod and fetched like any other. A
+# checkout of it here is a convenience for working on both at once, and it is
+# not anyone else's to clone: tracking it as a bare gitlink only ever gave a
+# fresh clone an empty directory.
+/gokit/
+
+# What `make e2e` leaves: one directory per run, with its screen, trace and review.
+/e2e/runs/
+.gstack/
+
+# Private planning notes
+todo.txt
