@@ -521,6 +521,43 @@ func (s *Server) handleCreateGroup(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, http.StatusOK, groupJSON(g))
 }
 
+func (s *Server) handleDeleteGroup(w http.ResponseWriter, r *http.Request) {
+	admin := s.requireAdmin(w, r)
+	if admin == nil {
+		return
+	}
+	g, err := s.store.PolicyGroupByID(r.PathValue("id"))
+	if errors.Is(err, store.ErrNotFound) {
+		writeErr(w, http.StatusNotFound, "no such group")
+		return
+	}
+	if err != nil {
+		writeErr(w, http.StatusInternalServerError, err.Error())
+		return
+	}
+	policies, err := s.store.Policies(g.ID, "")
+	if err != nil {
+		writeErr(w, http.StatusInternalServerError, err.Error())
+		return
+	}
+	if err := s.store.DeletePolicyGroup(g.ID); err != nil {
+		writeErr(w, http.StatusInternalServerError, err.Error())
+		return
+	}
+	// Spelled out for the same reason as a team: the policies went with it,
+	// and whoever it applied to lost them.
+	summary := "Deleted policy group " + g.Name + "."
+	switch n := len(policies); n {
+	case 0:
+	case 1:
+		summary = "Deleted policy group " + g.Name + " and the 1 policy in it."
+	default:
+		summary = "Deleted policy group " + g.Name + " and the " + strconv.Itoa(n) + " policies in it."
+	}
+	s.store.RecordChange(admin.ID, "group", "deleted", g.ID, g.Name, summary, nil)
+	writeJSON(w, http.StatusOK, map[string]bool{"ok": true})
+}
+
 func (s *Server) handleListPolicies(w http.ResponseWriter, r *http.Request) {
 	if s.requireAdmin(w, r) == nil {
 		return

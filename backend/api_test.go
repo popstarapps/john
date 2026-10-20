@@ -401,3 +401,58 @@ func TestEditingAnActivePolicy(t *testing.T) {
 		t.Fatalf("deleting it again = %d, want 404", code)
 	}
 }
+
+// Deleting a group takes its policies and team attachments with it, tells
+// running sessions, and leaves a record.
+func TestDeletingAPolicyGroup(t *testing.T) {
+	srv := testServerWithIdP(t)
+	base := "http://" + srv.Addr()
+
+	browser := browserClient(t)
+	resp, err := browser.Get(base + "/auth/login")
+	if err != nil {
+		t.Fatal(err)
+	}
+	resp.Body.Close()
+	admin := &apiClient{t: t, base: base, http: browser}
+
+	var group, other struct{ ID string }
+	admin.post("POST", "/api/v1/groups", map[string]any{"name": "doomed", "description": "", "baseline": false}, &group)
+	admin.post("POST", "/api/v1/groups", map[string]any{"name": "kept", "description": "", "baseline": false}, &other)
+	var team struct{ ID string }
+	admin.post("POST", "/api/v1/teams", map[string]any{
+		"name": "Payments", "slug": "payments", "description": "", "groupIds": []string{group.ID, other.ID},
+	}, &team)
+	for _, g := range []string{group.ID, other.ID} {
+		admin.post("POST", "/api/v1/policies", map[string]any{
+			"groupId": g, "name": "ws", "description": "",
+			"spec": map[string]any{"kind": "workspace", "paths": []string{".env"}, "mode": "exclude"},
+		}, nil)
+	}
+
+	epoch, _ := srv.Store().PolicyEpoch()
+	admin.post("DELETE", "/api/v1/groups/"+group.ID, nil, nil)
+
+	if code, _ := admin.do("GET", "/api/v1/groups/"+group.ID, nil); code != http.StatusNotFound {
+		t.Fatalf("deleted group = %d, want 404", code)
+	}
+	var policies []struct{ GroupID string }
+	admin.get("/api/v1/policies", &policies)
+	if len(policies) != 1 || policies[0].GroupID != other.ID {
+		t.Fatalf("policies after delete = %+v, want only the other group's", policies)
+	}
+	var teams []struct {
+		ID       string
+		GroupIDs []string `json:"policyGroupIds"`
+	}
+	admin.get("/api/v1/teams", &teams)
+	if len(teams) != 1 || len(teams[0].GroupIDs) != 1 || teams[0].GroupIDs[0] != other.ID {
+		t.Fatalf("team groups after delete = %+v, want only the other group", teams)
+	}
+	if after, _ := srv.Store().PolicyEpoch(); after == epoch {
+		t.Fatal("deleting a group did not tell running sessions")
+	}
+	if code, _ := admin.do("DELETE", "/api/v1/groups/"+group.ID, nil); code != http.StatusNotFound {
+		t.Fatalf("deleting it again = %d, want 404", code)
+	}
+}

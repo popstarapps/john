@@ -406,6 +406,7 @@ func (s *Server) handler() http.Handler {
 	mux.HandleFunc("GET /api/v1/groups", s.handleListGroups)
 	mux.HandleFunc("POST /api/v1/groups", s.handleCreateGroup)
 	mux.HandleFunc("GET /api/v1/groups/{id}", s.handleGetGroup)
+	mux.HandleFunc("DELETE /api/v1/groups/{id}", s.handleDeleteGroup)
 
 	mux.HandleFunc("GET /api/v1/policies", s.handleListPolicies)
 	mux.HandleFunc("POST /api/v1/policies", s.handleCreatePolicy)

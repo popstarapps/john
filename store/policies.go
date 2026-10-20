@@ -218,6 +218,36 @@ func (s *Store) DeletePolicy(id, actor string) (*Policy, error) {
 	return p, nil
 }
 
+// DeletePolicyGroup removes a group, every policy in it, and its attachments
+// to teams. A policy outside any group applies to nobody, so keeping them
+// would only leave rules behind that nothing can reach.
+func (s *Store) DeletePolicyGroup(id string) error {
+	tx, err := s.db.Begin()
+	if err != nil {
+		return err
+	}
+	defer tx.Rollback()
+	// What references the group goes first, as with a team.
+	if _, err := tx.Exec(`DELETE FROM policies WHERE group_id = ?`, id); err != nil {
+		return err
+	}
+	if _, err := tx.Exec(`DELETE FROM team_policy_groups WHERE group_id = ?`, id); err != nil {
+		return err
+	}
+	res, err := tx.Exec(`DELETE FROM policy_groups WHERE id = ?`, id)
+	if err != nil {
+		return err
+	}
+	if n, _ := res.RowsAffected(); n == 0 {
+		return ErrNotFound
+	}
+	if err := tx.Commit(); err != nil {
+		return err
+	}
+	s.BumpPolicyEpoch(ChangeGroups)
+	return nil
+}
+
 // PolicyByID looks a policy up.
 func (s *Store) PolicyByID(id string) (*Policy, error) {
 	return scanPolicy(s.db.QueryRow(`SELECT `+policyColumns+` FROM policies WHERE id = ?`, id))

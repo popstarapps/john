@@ -221,6 +221,11 @@ export async function createPolicyGroup(input: {
   return send<PolicyGroup>("POST", "/groups", input);
 }
 
+/** Deletes a group with every policy in it, and detaches it from its teams. */
+export async function deletePolicyGroup(id: ID): Promise<void> {
+  await send("DELETE", `/groups/${encodeURIComponent(id)}`);
+}
+
 export async function listPolicies(q?: { groupId?: ID; type?: PolicyType }): Promise<Policy[]> {
   return get<Policy[]>(`/policies${query({ groupId: q?.groupId, type: q?.type })}`);
 }

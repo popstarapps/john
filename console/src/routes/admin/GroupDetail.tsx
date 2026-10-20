@@ -1,9 +1,15 @@
 import { useState } from "react";
-import { Link, useParams } from "react-router-dom";
-import { getPolicyGroup, listPolicies, listTeams, setPolicyEnabled } from "../../api/client";
+import { Link, useNavigate, useParams } from "react-router-dom";
+import {
+  deletePolicyGroup,
+  getPolicyGroup,
+  listPolicies,
+  listTeams,
+  setPolicyEnabled,
+} from "../../api/client";
 import { useAction, useQuery } from "../../lib/useQuery";
 import { Badge, Card, Empty, Loading, PageHead, Tag } from "../../components/ui";
-import { useToast } from "../../components/overlays";
+import { ConfirmDialog, useToast } from "../../components/overlays";
 import { AddPolicyDialog, EditPolicyDrawer } from "../../components/PolicyEditor";
 import { PolicyTypeTag, SpecSummary } from "../../components/domain";
 import { Icon } from "../../components/Icon";
@@ -15,11 +21,14 @@ export default function GroupDetail() {
   const toast = useToast();
   const [open, setOpen] = useState<Policy | null>(null);
   const [adding, setAdding] = useState(false);
+  const [deleting, setDeleting] = useState(false);
+  const navigate = useNavigate();
 
   const { data: group, initial } = useQuery(() => getPolicyGroup(id), [id]);
   const { data: policies } = useQuery(() => listPolicies({ groupId: id }), [id]);
   const { data: teams } = useQuery(() => listTeams(), []);
   const [toggle, toggling] = useAction(setPolicyEnabled);
+  const [remove, removing] = useAction(deletePolicyGroup);
 
   if (initial) return <Loading rows={6} height={40} />;
   if (!group)
@@ -46,9 +55,14 @@ export default function GroupDetail() {
           </>
         }
         actions={
-          <button className="btn btn--primary" onClick={() => setAdding(true)}>
-            <Icon name="plus" size={14} /> Add policy
-          </button>
+          <>
+            <button className="btn btn--danger" onClick={() => setDeleting(true)}>
+              <Icon name="trash" size={14} /> Delete group
+            </button>
+            <button className="btn btn--primary" onClick={() => setAdding(true)}>
+              <Icon name="plus" size={14} /> Add policy
+            </button>
+          </>
         }
       />
 
@@ -147,6 +161,43 @@ export default function GroupDetail() {
           )}
         </Card>
       </div>
+
+      {deleting && (
+        <ConfirmDialog
+          title={`Delete ${group.name}?`}
+          body={
+            <>
+              {policies && policies.length > 0
+                ? `Its ${policies.length === 1 ? "policy goes" : `${policies.length} policies go`} with it. `
+                : ""}
+              {group.baseline
+                ? "It is a baseline group, so it stops applying to everyone straight away."
+                : attachedTeams.length > 0
+                  ? `It stops applying to ${attachedTeams.map((t) => t.name).join(", ")} straight away.`
+                  : "It is not attached to any team."}{" "}
+              This cannot be undone; the change history keeps a record.
+            </>
+          }
+          confirmLabel="Delete group"
+          danger
+          busy={removing}
+          onClose={() => setDeleting(false)}
+          onConfirm={async () => {
+            try {
+              await remove(group.id);
+            } catch (err) {
+              toast({
+                tone: "deny",
+                title: `${group.name} was not deleted`,
+                body: err instanceof Error ? err.message : "The backend refused.",
+              });
+              return;
+            }
+            toast({ tone: "warn", title: `${group.name} deleted` });
+            navigate("/admin/groups");
+          }}
+        />
+      )}
 
       {adding && (
         <AddPolicyDialog groupId={group.id} groupName={group.name} onClose={() => setAdding(false)} />
