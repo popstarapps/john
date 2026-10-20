@@ -320,3 +320,84 @@ func TestUsageSummaryRoundTrip(t *testing.T) {
 	}
 
 }
+
+// An active policy can be edited in place: the edit lands, bumps the version,
+// is recorded, and cannot silently overwrite someone else's or change kind.
+func TestEditingAnActivePolicy(t *testing.T) {
+	srv := testServerWithIdP(t)
+	base := "http://" + srv.Addr()
+
+	browser := browserClient(t)
+	resp, err := browser.Get(base + "/auth/login")
+	if err != nil {
+		t.Fatal(err)
+	}
+	resp.Body.Close()
+	admin := &apiClient{t: t, base: base, http: browser}
+
+	var group struct{ ID string }
+	admin.post("POST", "/api/v1/groups", map[string]any{"name": "g", "description": "", "baseline": true}, &group)
+
+	network := func(methods ...string) map[string]any {
+		return map[string]any{"kind": "network", "methods": methods, "scheme": "https",
+			"host": "proxy.golang.org", "port": 443, "path": "/*",
+			"headerMatches": []any{}, "queryMatches": []any{},
+			"decision": "always-allow", "maxBodyBytes": 0}
+	}
+	type policy struct {
+		ID      string
+		Name    string
+		Version int
+		Spec    struct{ Methods []string }
+	}
+	var p policy
+	admin.post("POST", "/api/v1/policies", map[string]any{
+		"groupId": group.ID, "name": "go proxy", "description": "", "spec": network("GET"),
+	}, &p)
+
+	epoch, _ := srv.Store().PolicyEpoch()
+	var edited policy
+	admin.post("PUT", "/api/v1/policies/"+p.ID, map[string]any{
+		"name": "go proxy (read)", "description": "module downloads", "spec": network("GET", "HEAD"),
+		"version": p.Version,
+	}, &edited)
+	if edited.Name != "go proxy (read)" || len(edited.Spec.Methods) != 2 || edited.Version != p.Version+1 {
+		t.Fatalf("edited = %+v, want the new name, GET+HEAD and v%d", edited, p.Version+1)
+	}
+	if after, _ := srv.Store().PolicyEpoch(); after == epoch {
+		t.Fatal("editing a policy did not tell running sessions")
+	}
+
+	// Saved from the version before: someone else got there first.
+	if code, _ := admin.do("PUT", "/api/v1/policies/"+p.ID, map[string]any{
+		"name": "stale", "description": "", "spec": network("GET"), "version": p.Version,
+	}); code != http.StatusConflict {
+		t.Fatalf("stale edit = %d, want 409", code)
+	}
+	// A spec of another kind is a different policy.
+	if code, _ := admin.do("PUT", "/api/v1/policies/"+p.ID, map[string]any{
+		"name": "x", "description": "", "spec": map[string]any{"kind": "workspace", "paths": []string{"a"}, "mode": "exclude"},
+	}); code != http.StatusBadRequest {
+		t.Fatalf("kind change = %d, want 400", code)
+	}
+	if code, _ := admin.do("PUT", "/api/v1/policies/p-nope", map[string]any{
+		"name": "x", "description": "", "spec": network("GET"),
+	}); code != http.StatusNotFound {
+		t.Fatalf("missing policy = %d, want 404", code)
+	}
+
+	// And it can be deleted: gone from the group, sessions told, history kept.
+	epoch, _ = srv.Store().PolicyEpoch()
+	admin.post("DELETE", "/api/v1/policies/"+p.ID, nil, nil)
+	var left []policy
+	admin.get("/api/v1/policies?groupId="+group.ID, &left)
+	if len(left) != 0 {
+		t.Fatalf("policies after delete = %+v, want none", left)
+	}
+	if after, _ := srv.Store().PolicyEpoch(); after == epoch {
+		t.Fatal("deleting a policy did not tell running sessions")
+	}
+	if code, _ := admin.do("DELETE", "/api/v1/policies/"+p.ID, nil); code != http.StatusNotFound {
+		t.Fatalf("deleting it again = %d, want 404", code)
+	}
+}

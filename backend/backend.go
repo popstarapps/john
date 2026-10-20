@@ -99,6 +99,21 @@ func Run(args []string, version string) int {
 	)
 	fs.Parse(args)
 
+	// A backend with no organization can do nothing but be set up, so that
+	// is what it does, rather than serving a backend nobody can sign in to
+	// and naming the flag that would have helped.
+	if !*setup {
+		configured, err := hasOrg(*dbPath)
+		if err != nil {
+			fmt.Fprintln(os.Stderr, "john backend:", err)
+			return 1
+		}
+		if !configured {
+			fmt.Println("No organization is configured yet — starting setup.")
+			*setup = true
+		}
+	}
+
 	srv, err := New(Config{DBPath: *dbPath, Listen: *listen, Version: version, Setup: *setup})
 	if err != nil {
 		fmt.Fprintln(os.Stderr, "john backend:", err)
@@ -129,11 +144,8 @@ func Run(args []string, version string) int {
 		srv.OfferRemoteSetup(os.Stdin, os.Stdout,
 			term.IsTerminal(int(os.Stdin.Fd())) && term.IsTerminal(int(os.Stdout.Fd())),
 			OtherAddresses())
-		fmt.Println("When setup completes, stop this process and start the backend without --setup.")
+		fmt.Println("When setup completes, stop this process and run `john backend` again.")
 	} else {
-		if _, err := srv.Store().Org(); errors.Is(err, store.ErrNoOrg) {
-			fmt.Println("No organization is configured yet — run `john backend --setup` first.")
-		}
 		fmt.Printf("john backend %s listening on http://%s (db %s)\n", version, srv.Addr(), *dbPath)
 	}
 	if err := srv.Serve(ctx); err != nil {
@@ -141,6 +153,23 @@ func Run(args []string, version string) int {
 		return 1
 	}
 	return 0
+}
+
+// hasOrg reports whether the database at path holds an organization. A
+// database that does not exist yet holds none; opening it creates it, which
+// New would have done anyway.
+func hasOrg(path string) (bool, error) {
+	st, err := store.Open(path)
+	if err != nil {
+		return false, err
+	}
+	defer st.Close()
+	if _, err := st.Org(); errors.Is(err, store.ErrNoOrg) {
+		return false, nil
+	} else if err != nil {
+		return false, err
+	}
+	return true, nil
 }
 
 // New opens the database, applies migrations, and binds the listener. It does
@@ -381,6 +410,8 @@ func (s *Server) handler() http.Handler {
 	mux.HandleFunc("GET /api/v1/policies", s.handleListPolicies)
 	mux.HandleFunc("POST /api/v1/policies", s.handleCreatePolicy)
 	mux.HandleFunc("GET /api/v1/policies/{id}", s.handleGetPolicy)
+	mux.HandleFunc("PUT /api/v1/policies/{id}", s.handleUpdatePolicy)
+	mux.HandleFunc("DELETE /api/v1/policies/{id}", s.handleDeletePolicy)
 	mux.HandleFunc("PUT /api/v1/policies/{id}/enabled", s.handleSetPolicyEnabled)
 
 	mux.HandleFunc("GET /api/v1/models", s.handleListModels)
@@ -418,6 +449,7 @@ func (s *Server) handler() http.Handler {
 	mux.HandleFunc("GET /api/v1/policy/signing-key", s.handleSigningPublicKey)
 
 	mux.HandleFunc("GET /api/v1/releases", s.handleListReleases)
+	mux.HandleFunc("GET /api/v1/releases/link", s.handleReleaseLink)
 	mux.HandleFunc("GET /releases/{file}", s.handleDownloadRelease)
 
 	mux.HandleFunc("GET /api/v1/session", s.handleSessionWS)

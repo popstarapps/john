@@ -15,18 +15,29 @@ import { Icon } from "./Icon";
 
 /* ---------- escape / outside-click helpers ---------- */
 
+// Open sheets, newest last. Escape closes only the one on top — a confirm
+// dialog over a drawer should not take the drawer, and its unsaved edits, with
+// it.
+const escapeStack: Array<{ current: () => void }> = [];
+
 function useEscape(active: boolean, onClose: () => void) {
+  const ref = useRef(onClose);
+  ref.current = onClose;
   useEffect(() => {
     if (!active) return;
+    escapeStack.push(ref);
     const onKey = (e: KeyboardEvent) => {
-      if (e.key === "Escape") {
+      if (e.key === "Escape" && escapeStack[escapeStack.length - 1] === ref) {
         e.stopPropagation();
-        onClose();
+        ref.current();
       }
     };
     document.addEventListener("keydown", onKey);
-    return () => document.removeEventListener("keydown", onKey);
-  }, [active, onClose]);
+    return () => {
+      document.removeEventListener("keydown", onKey);
+      escapeStack.splice(escapeStack.indexOf(ref), 1);
+    };
+  }, [active]);
 }
 
 /* ---------- modal & drawer ---------- */

@@ -5,9 +5,11 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"net"
 	"net/http"
 	"os"
 	"sync"
+	"syscall"
 	"time"
 
 	"github.com/popstarapps/john/client/credstore"
@@ -40,6 +42,54 @@ var refreshEvery = 30 * time.Minute
 // expired unused. Only `john login` fixes it.
 var ErrSignInRequired = errors.New("your sign-in has expired — run `john login`")
 
+// BackendUnavailableError means the backend did not answer the refresh at
+// all: it is down, restarting, or behind a proxy with nothing to send to. It is
+// not a sign-in problem, and saying so is most of the help — the instinct on
+// seeing "sign-in" and "expired" together is to run `john login`, which would
+// fail the same way.
+type BackendUnavailableError struct {
+	URL    string
+	Status int   // the 5xx it answered with; 0 when nothing answered
+	Err    error // the transport error, when there was one
+}
+
+func (e *BackendUnavailableError) Error() string {
+	return fmt.Sprintf("can't reach the john backend at %s (%s).\n"+
+		"      Your sign-in is still valid — this isn't a login problem.\n"+
+		"      The backend may be restarting or down. Try again in a minute.", e.URL, e.Reason())
+}
+
+func (e *BackendUnavailableError) Unwrap() error { return e.Err }
+
+// Reason is the short why: the status it answered with, or what became of
+// the connection when nothing did.
+func (e *BackendUnavailableError) Reason() string {
+	if e.Status != 0 {
+		return fmt.Sprintf("%d %s", e.Status, http.StatusText(e.Status))
+	}
+	var dns *net.DNSError
+	var ne net.Error
+	switch {
+	case errors.Is(e.Err, syscall.ECONNREFUSED):
+		return "connection refused"
+	case errors.As(e.Err, &dns):
+		return "host not found"
+	case errors.As(e.Err, &ne) && ne.Timeout():
+		return "timed out"
+	}
+	return "no answer"
+}
+
+// refreshClient bounds getting a connection, and only that. A backend that
+// has the request may already have spent the refresh token, and giving up on
+// its answer would mean presenting the spent one next time — which revokes
+// the whole sign-in. Waiting on a slow answer is the lesser problem.
+var refreshClient = &http.Client{Transport: &http.Transport{
+	Proxy:               http.ProxyFromEnvironment,
+	DialContext:         (&net.Dialer{Timeout: 10 * time.Second}).DialContext,
+	TLSHandshakeTimeout: 10 * time.Second,
+}}
+
 // refreshNow trades the stored refresh token for a new pair and saves it.
 func refreshNow(c *credstore.Credentials) (*credstore.Credentials, error) {
 	if c.Refresh == "" {
@@ -54,14 +104,17 @@ func refreshNow(c *credstore.Credentials) (*credstore.Credentials, error) {
 	if err != nil {
 		return nil, err
 	}
-	resp, err := http.Post(c.BackendURL+"/api/v1/auth/refresh", "application/json", bytes.NewReader(body))
+	resp, err := refreshClient.Post(c.BackendURL+"/api/v1/auth/refresh", "application/json", bytes.NewReader(body))
 	if err != nil {
-		return nil, err
+		return nil, &BackendUnavailableError{URL: c.BackendURL, Err: err}
 	}
 	defer resp.Body.Close()
 
 	if resp.StatusCode == http.StatusUnauthorized {
 		return nil, ErrSignInRequired
+	}
+	if resp.StatusCode >= 500 {
+		return nil, &BackendUnavailableError{URL: c.BackendURL, Status: resp.StatusCode}
 	}
 	if resp.StatusCode != http.StatusOK {
 		return nil, fmt.Errorf("refreshing this machine's sign-in: status %d", resp.StatusCode)
@@ -115,7 +168,9 @@ func needsRefresh(c *credstore.Credentials) bool {
 
 // ensureFresh renews the credentials if they are near expiry. A backend that
 // cannot be reached is not fatal — the token in hand may still have hours
-// left, and the session should start — but an expired sign-in is.
+// left, and the session should start — but an expired sign-in is. So is an
+// unreachable backend once the token in hand has run out; that comes back as
+// a *BackendUnavailableError, which waitForBackend knows how to sit out.
 func ensureFresh(c *credstore.Credentials) (*credstore.Credentials, error) {
 	if !needsRefresh(c) {
 		return c, nil
@@ -126,6 +181,10 @@ func ensureFresh(c *credstore.Credentials) (*credstore.Credentials, error) {
 	}
 	if err != nil {
 		if time.Now().After(c.ExpiresAt) && !c.ExpiresAt.IsZero() {
+			var down *BackendUnavailableError
+			if errors.As(err, &down) {
+				return nil, err // says what to do, which a suffix would muddy
+			}
 			return nil, fmt.Errorf("%w (and this machine's token has expired)", err)
 		}
 		return c, nil // keep going on what we have

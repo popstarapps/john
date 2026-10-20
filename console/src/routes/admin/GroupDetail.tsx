@@ -2,19 +2,17 @@ import { useState } from "react";
 import { Link, useParams } from "react-router-dom";
 import { getPolicyGroup, listPolicies, listTeams, setPolicyEnabled } from "../../api/client";
 import { useAction, useQuery } from "../../lib/useQuery";
-import { useDirectory } from "../../lib/directory";
-import { Badge, Card, Empty, KV, Loading, PageHead, Row, Tag } from "../../components/ui";
-import { Drawer, useToast } from "../../components/overlays";
-import { AddPolicyDialog } from "../../components/PolicyEditor";
-import { PolicyTypeTag, SpecDetail, SpecSummary } from "../../components/domain";
+import { Badge, Card, Empty, Loading, PageHead, Tag } from "../../components/ui";
+import { useToast } from "../../components/overlays";
+import { AddPolicyDialog, EditPolicyDrawer } from "../../components/PolicyEditor";
+import { PolicyTypeTag, SpecSummary } from "../../components/domain";
 import { Icon } from "../../components/Icon";
-import { dateTime, relative } from "../../lib/format";
+import { relative } from "../../lib/format";
 import type { Policy } from "../../api/types";
 
 export default function GroupDetail() {
   const { id = "" } = useParams();
   const toast = useToast();
-  const dir = useDirectory();
   const [open, setOpen] = useState<Policy | null>(null);
   const [adding, setAdding] = useState(false);
 
@@ -155,32 +153,12 @@ export default function GroupDetail() {
       )}
 
       {open && (
-        <Drawer
-          title={open.name}
-          sub={<PolicyTypeTag type={open.type} plain />}
+        <EditPolicyDrawer
+          key={open.id}
+          policy={open}
+          groupName={group.name}
           onClose={() => setOpen(null)}
-          footer={
-            <button className="btn" onClick={() => setOpen(null)}>
-              Close
-            </button>
-          }
-        >
-          <p className="lede" style={{ marginBottom: 16 }}>
-            {open.description}
-          </p>
-          <SpecDetail spec={open.spec} modelName={(mid) => dir.modelName(mid)} />
-          <div style={{ marginTop: 16 }}>
-            <KV>
-              <Row k="Group">{group.name}</Row>
-              <Row k="Version">v{open.version}</Row>
-              <Row k="Updated">{dateTime(open.updatedAt)}</Row>
-              <Row k="Updated by">{dir.userName(open.updatedBy)}</Row>
-              <Row k="Status">
-                {open.enabled ? <Badge tone="allow">Enabled</Badge> : <Badge>Disabled</Badge>}
-              </Row>
-            </KV>
-          </div>
-        </Drawer>
+        />
       )}
     </>
   );

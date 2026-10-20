@@ -5,13 +5,16 @@
 package client
 
 import (
+	"context"
 	"errors"
 	"flag"
 	"fmt"
 	"os"
+	"os/signal"
 
 	"github.com/popstarapps/john/client/credstore"
 	"github.com/popstarapps/john/sandbox"
+	"github.com/popstarapps/john/terminalui"
 )
 
 // Run is the `john` session entrypoint — the bare command, with no arguments,
@@ -64,9 +67,25 @@ func Run(args []string) int {
 	// The access token lives hours, so a machine that has not run john since
 	// yesterday starts by renewing. Only a sign-in that is genuinely over
 	// stops us here; anything else is transient and the token in hand may
-	// still be good.
+	// still be good. A backend that is down while the token has run out is
+	// waited out on a terminal, since it is usually back within seconds.
 	if creds != nil {
-		creds, err = ensureFresh(creds)
+		held := creds
+		try := func() (*credstore.Credentials, error) { return ensureFresh(held) }
+		if stdinIsATerminal() {
+			theme := terminalui.DefaultTheme(os.Stderr)
+			if *ascii {
+				theme.SetASCII()
+			}
+			ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt)
+			creds, err = waitForBackend(ctx, os.Stderr, theme, try)
+			stop()
+		} else {
+			creds, err = try()
+		}
+		if errors.Is(err, context.Canceled) {
+			return 130
+		}
 		if err != nil {
 			fmt.Fprintln(os.Stderr, "john:", err)
 			return 1

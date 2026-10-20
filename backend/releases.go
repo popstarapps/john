@@ -2,6 +2,10 @@ package backend
 
 import (
 	"compress/gzip"
+	"crypto/hmac"
+	"crypto/rand"
+	"crypto/sha256"
+	"encoding/base64"
 	"encoding/binary"
 	"io"
 	"io/fs"
@@ -9,6 +13,7 @@ import (
 	"sort"
 	"strconv"
 	"strings"
+	"time"
 )
 
 // The backend hands out the client for every platform, from inside its own
@@ -89,15 +94,71 @@ func (s *Server) handleListReleases(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, http.StatusOK, rels)
 }
 
+// A developer installing from a terminal has no browser session to show, so
+// the download page hands them a link that carries its own permission: a
+// signature over an expiry, made with a key that lives only in this process.
+// It is minted for someone signed in and lasts minutes, which keeps downloads
+// behind sign-in without the snippet carrying anything worth stealing. A
+// restart forgets the key, and with it every link — the page simply asks
+// again.
+const releaseLinkLife = 15 * time.Minute
+
+var releaseLinkKey = func() []byte {
+	k := make([]byte, 32)
+	rand.Read(k)
+	return k
+}()
+
+func releaseLinkSig(exp int64) string {
+	m := hmac.New(sha256.New, releaseLinkKey)
+	m.Write([]byte("release-download\n" + strconv.FormatInt(exp, 10)))
+	return base64.RawURLEncoding.EncodeToString(m.Sum(nil))
+}
+
+// newReleaseLink returns the token a download link carries, good until exp.
+func newReleaseLink(now time.Time) (token string, exp time.Time) {
+	exp = now.Add(releaseLinkLife)
+	return strconv.FormatInt(exp.Unix(), 10) + "." + releaseLinkSig(exp.Unix()), exp
+}
+
+// validReleaseLink reports whether token is one newReleaseLink made and it
+// has not run out.
+func validReleaseLink(token string, now time.Time) bool {
+	expStr, sig, ok := strings.Cut(token, ".")
+	if !ok {
+		return false
+	}
+	exp, err := strconv.ParseInt(expStr, 10, 64)
+	if err != nil || now.Unix() > exp {
+		return false
+	}
+	return hmac.Equal([]byte(sig), []byte(releaseLinkSig(exp)))
+}
+
+// handleReleaseLink is GET /api/v1/releases/link: a download token for the
+// install snippets on the download page.
+func (s *Server) handleReleaseLink(w http.ResponseWriter, r *http.Request) {
+	if s.requireUser(w, r) == nil {
+		return
+	}
+	token, exp := newReleaseLink(time.Now())
+	writeJSON(w, http.StatusOK, map[string]any{"token": token, "expiresAt": exp.UTC().Format(time.RFC3339)})
+}
+
 // handleDownloadRelease is GET /releases/{file}: it streams one client build.
-// Requires a session so downloads stay behind sign-in.
+// Requires a session or a download link, so downloads stay behind sign-in.
 //
 // A browser gets the binary, decompressed. The client's own update asks for
 // application/gzip and gets the stored bytes as they are: a sixth of the size,
 // which over a slow link is most of the wait. Both carry Content-Length, so
 // both can say how far along they are.
 func (s *Server) handleDownloadRelease(w http.ResponseWriter, r *http.Request) {
-	if s.requireUser(w, r) == nil {
+	if t := r.URL.Query().Get("t"); t != "" {
+		if !validReleaseLink(t, time.Now()) {
+			writeErr(w, http.StatusUnauthorized, "download link expired — copy a fresh one from the download page")
+			return
+		}
+	} else if s.requireUser(w, r) == nil {
 		return
 	}
 	file := r.PathValue("file")

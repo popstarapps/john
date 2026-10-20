@@ -238,6 +238,19 @@ export async function createPolicy(input: {
   return send<Policy>("POST", "/policies", input);
 }
 
+/** Rewrites a policy in place. `version` is the one the editor started from:
+ *  if someone else saved since, the backend refuses rather than overwrite. */
+export async function updatePolicy(
+  id: ID,
+  input: { name: string; description: string; spec: PolicySpec; version: number },
+): Promise<Policy> {
+  return send<Policy>("PUT", `/policies/${encodeURIComponent(id)}`, input);
+}
+
+export async function deletePolicy(id: ID): Promise<void> {
+  await send("DELETE", `/policies/${encodeURIComponent(id)}`);
+}
+
 export async function setPolicyEnabled(id: ID, enabled: boolean): Promise<void> {
   await send("PUT", `/policies/${encodeURIComponent(id)}/enabled`, { enabled });
 }
@@ -735,6 +748,12 @@ export interface Release {
  *  platform. Empty when the backend was built without them bundled. */
 export async function listReleases(): Promise<Release[]> {
   return get<Release[]>("/releases");
+}
+
+/** A download token for the install snippets: a terminal has no session, so
+ *  the link carries its own permission. It lasts minutes. */
+export async function releaseLink(): Promise<{ token: string; expiresAt: string }> {
+  return get("/releases/link");
 }
 
 /** The first-run wizard posts this, authenticated by the one-time token in

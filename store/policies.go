@@ -159,6 +159,65 @@ func (s *Store) CreatePolicy(groupID, name, description string, spec json.RawMes
 	return s.PolicyByID(id)
 }
 
+// ErrStalePolicy means the policy changed since the caller read it: someone
+// else saved first, and writing over them would lose their change unseen.
+var ErrStalePolicy = errors.New("store: policy changed since it was read")
+
+// UpdatePolicy rewrites a policy's name, description and spec in place. Its
+// type is fixed — a spec of another kind is a different policy, not an edit to
+// this one. When version is non-zero the write only lands on that version.
+func (s *Store) UpdatePolicy(id, name, description string, spec json.RawMessage, version int, actor string) (*Policy, error) {
+	cur, err := s.PolicyByID(id)
+	if err != nil {
+		return nil, err
+	}
+	var kind struct {
+		Kind string `json:"kind"`
+	}
+	if err := json.Unmarshal(spec, &kind); err != nil || kind.Kind != cur.Type {
+		return nil, fmt.Errorf("store: a %s policy needs a %s spec, got %q", cur.Type, cur.Type, kind.Kind)
+	}
+
+	now := time.Now().UTC().Format(time.RFC3339)
+	q := `UPDATE policies SET name = ?, description = ?, spec = ?, version = version + 1, updated_at = ?, updated_by = ? WHERE id = ?`
+	args := []any{name, description, string(spec), now, actor, id}
+	if version != 0 {
+		q += ` AND version = ?`
+		args = append(args, version)
+	}
+	res, err := s.db.Exec(q, args...)
+	if err != nil {
+		return nil, err
+	}
+	if n, _ := res.RowsAffected(); n == 0 {
+		return nil, ErrStalePolicy
+	}
+	if _, err := s.db.Exec(`UPDATE policy_groups SET version = version + 1, updated_at = ?, updated_by = ? WHERE id = ?`,
+		now, actor, cur.GroupID); err != nil {
+		return nil, err
+	}
+	s.BumpPolicyEpoch(policyChangeKind[cur.Type])
+	return s.PolicyByID(id)
+}
+
+// DeletePolicy removes a policy for good. Requests it decided keep its id in
+// their log, so they still say which rule let them through.
+func (s *Store) DeletePolicy(id, actor string) (*Policy, error) {
+	p, err := s.PolicyByID(id)
+	if err != nil {
+		return nil, err
+	}
+	if _, err := s.db.Exec(`DELETE FROM policies WHERE id = ?`, id); err != nil {
+		return nil, err
+	}
+	if _, err := s.db.Exec(`UPDATE policy_groups SET version = version + 1, updated_at = ?, updated_by = ? WHERE id = ?`,
+		time.Now().UTC().Format(time.RFC3339), actor, p.GroupID); err != nil {
+		return nil, err
+	}
+	s.BumpPolicyEpoch(policyChangeKind[p.Type])
+	return p, nil
+}
+
 // PolicyByID looks a policy up.
 func (s *Store) PolicyByID(id string) (*Policy, error) {
 	return scanPolicy(s.db.QueryRow(`SELECT `+policyColumns+` FROM policies WHERE id = ?`, id))

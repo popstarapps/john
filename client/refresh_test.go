@@ -1,10 +1,15 @@
 package client
 
 import (
+	"bytes"
 	"context"
+	"errors"
+	"io"
 	"net/http"
 	"net/http/cookiejar"
+	"net/http/httptest"
 	"path/filepath"
+	"strings"
 	"sync"
 	"testing"
 	"time"
@@ -13,6 +18,7 @@ import (
 	"github.com/popstarapps/john/backend"
 	"github.com/popstarapps/john/client/credstore"
 	"github.com/popstarapps/john/store"
+	"github.com/popstarapps/john/terminalui"
 )
 
 // signedInAgainstARealBackend runs the whole sign-in — CLI start, a headless
@@ -276,5 +282,129 @@ func TestCredentialsWithNoRecordedExpiryAreRenewed(t *testing.T) {
 	preRefresh := credstore.Credentials{BackendURL: creds.BackendURL, Token: "old-style-token"}
 	if needsRefresh(&preRefresh) {
 		t.Fatal("a machine with nothing to refresh with was asked to refresh")
+	}
+}
+
+// A backend that is down while the token has run out is not a sign-in
+// problem, and the message must not read like one: the instinct on seeing
+// "sign-in" and "expired" together is `john login`, which fails the same way.
+func TestADownBackendWithAnExpiredTokenSaysItIsTheBackend(t *testing.T) {
+	t.Setenv("JOHN_HOME", t.TempDir())
+
+	gateway := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusBadGateway)
+	}))
+	defer gateway.Close()
+
+	for name, url := range map[string]string{
+		"502":     gateway.URL,
+		"refused": "http://127.0.0.1:1",
+	} {
+		t.Run(name, func(t *testing.T) {
+			creds := &credstore.Credentials{
+				BackendURL: url,
+				Token:      "expired",
+				Refresh:    "some-refresh-token",
+				ExpiresAt:  time.Now().Add(-time.Minute),
+			}
+			_, err := ensureFresh(creds)
+			var down *BackendUnavailableError
+			if !errors.As(err, &down) {
+				t.Fatalf("ensureFresh = %v, want *BackendUnavailableError", err)
+			}
+			msg := err.Error()
+			if !strings.Contains(msg, url) || !strings.Contains(msg, "isn't a login problem") {
+				t.Fatalf("message does not name the backend or rule out sign-in: %q", msg)
+			}
+			if strings.Contains(msg, "expired") {
+				t.Fatalf("message still reads like a sign-in problem: %q", msg)
+			}
+		})
+	}
+	creds := &credstore.Credentials{BackendURL: gateway.URL, Refresh: "x", ExpiresAt: time.Now().Add(-time.Minute)}
+	_, err := ensureFresh(creds)
+	if !strings.Contains(err.Error(), "502 Bad Gateway") {
+		t.Fatalf("message does not carry the status: %q", err)
+	}
+}
+
+func fastBackendWait(t *testing.T, limit time.Duration) {
+	t.Helper()
+	first, max, lim, frame := backendWaitFirst, backendWaitMax, backendWaitLimit, backendWaitFrame
+	backendWaitFirst, backendWaitMax, backendWaitLimit, backendWaitFrame =
+		5*time.Millisecond, 10*time.Millisecond, limit, time.Millisecond
+	t.Cleanup(func() {
+		backendWaitFirst, backendWaitMax, backendWaitLimit, backendWaitFrame = first, max, lim, frame
+	})
+}
+
+// A deploy is over in seconds; the session starts the moment it is.
+func TestWaitingOutABackendThatComesBack(t *testing.T) {
+	fastBackendWait(t, time.Minute)
+
+	calls := 0
+	want := &credstore.Credentials{Token: "renewed"}
+	var out bytes.Buffer
+	got, err := waitForBackend(context.Background(), &out, terminalui.DefaultTheme(io.Discard),
+		func() (*credstore.Credentials, error) {
+			calls++
+			if calls < 3 {
+				return nil, &BackendUnavailableError{URL: "https://john.example.com", Status: 502}
+			}
+			return want, nil
+		})
+	if err != nil || got != want {
+		t.Fatalf("waitForBackend = %v, %v; want the renewed credentials", got, err)
+	}
+	if calls != 3 {
+		t.Fatalf("tried %d times, want 3", calls)
+	}
+	if !strings.Contains(out.String(), "john.example.com is unavailable (502 Bad Gateway)") {
+		t.Fatalf("the wait did not say what it was waiting for: %q", out.String())
+	}
+}
+
+// Past the limit it is an outage, not a blip, and it is reported as one.
+func TestWaitingForABackendGivesUp(t *testing.T) {
+	fastBackendWait(t, 30*time.Millisecond)
+
+	_, err := waitForBackend(context.Background(), io.Discard, terminalui.DefaultTheme(io.Discard),
+		func() (*credstore.Credentials, error) {
+			return nil, &BackendUnavailableError{URL: "https://john.example.com", Status: 503}
+		})
+	var down *BackendUnavailableError
+	if !errors.As(err, &down) {
+		t.Fatalf("waitForBackend = %v, want the outage reported", err)
+	}
+}
+
+// Only an unavailable backend is worth waiting for; an ended sign-in is not
+// going to come back by itself.
+func TestWaitingDoesNotSitOutAnEndedSignIn(t *testing.T) {
+	fastBackendWait(t, time.Minute)
+
+	calls := 0
+	_, err := waitForBackend(context.Background(), io.Discard, terminalui.DefaultTheme(io.Discard),
+		func() (*credstore.Credentials, error) {
+			calls++
+			return nil, ErrSignInRequired
+		})
+	if err != ErrSignInRequired || calls != 1 {
+		t.Fatalf("waitForBackend = %v after %d tries, want ErrSignInRequired after 1", err, calls)
+	}
+}
+
+// Ctrl-C ends the wait at once.
+func TestWaitingForABackendCanBeInterrupted(t *testing.T) {
+	fastBackendWait(t, time.Minute)
+
+	ctx, cancel := context.WithCancel(context.Background())
+	cancel()
+	_, err := waitForBackend(ctx, io.Discard, terminalui.DefaultTheme(io.Discard),
+		func() (*credstore.Credentials, error) {
+			return nil, &BackendUnavailableError{URL: "https://john.example.com"}
+		})
+	if !errors.Is(err, context.Canceled) {
+		t.Fatalf("waitForBackend = %v, want context.Canceled", err)
 	}
 }

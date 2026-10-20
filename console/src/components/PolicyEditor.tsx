@@ -1,17 +1,21 @@
 import { useState } from "react";
-import { Field, Tag } from "./ui";
-import { Modal, useToast } from "./overlays";
+import { Badge, Field, KV, Row, Tag } from "./ui";
+import { ConfirmDialog, Drawer, Modal, useToast } from "./overlays";
+import { Icon } from "./Icon";
 import { PolicyTypeTag, policyTypeLabel } from "./domain";
-import { createPolicy, listModels } from "../api/client";
+import { createPolicy, deletePolicy, listModels, updatePolicy } from "../api/client";
 import { useAction, useQuery } from "../lib/useQuery";
-import type { Model, NetworkAttributeMatch, PolicySpec, PolicyType } from "../api/types";
+import { useDirectory } from "../lib/directory";
+import { dateTime } from "../lib/format";
+import type { Model, NetworkAttributeMatch, Policy, PolicySpec, PolicyType } from "../api/types";
 import { providerLabel } from "./ModelDialog";
 
 /* Editing a policy's matcher.
  *
- * One editor, three callers: the developer asking for network access, the
- * administrator adding a policy to a group, and the administrator amending a
- * request before approving it. A rule should look and behave the same wherever
+ * One editor, four callers: the developer asking for network access, the
+ * administrator adding a policy to a group, the administrator amending a
+ * request before approving it, and the administrator changing a policy that
+ * is already in force. A rule should look and behave the same wherever
  * it is written, and there is only one place to change when a matcher grows a
  * field. */
 
@@ -600,5 +604,149 @@ export function AddPolicyDialog({
 
       <SpecEditor spec={spec} onChange={setSpec} models={models} showErrors={submitted} advanced />
     </Modal>
+  );
+}
+
+/** Editing a policy that already exists — active or not. The kind is fixed:
+ *  a rule of another kind is a different policy, added on its own. */
+export function EditPolicyDrawer({
+  policy,
+  groupName,
+  onClose,
+}: {
+  policy: Policy;
+  groupName: string;
+  onClose: () => void;
+}) {
+  const toast = useToast();
+  const dir = useDirectory();
+  const { data: models } = useQuery(() => listModels(), []);
+  const [spec, setSpec] = useState<PolicySpec>(policy.spec);
+  const [name, setName] = useState(policy.name);
+  const [description, setDescription] = useState(policy.description);
+  const [submitted, setSubmitted] = useState(false);
+  const [save, saving] = useAction(updatePolicy);
+  const [remove, removing] = useAction(deletePolicy);
+  const [confirmingDelete, setConfirmingDelete] = useState(false);
+
+  const valid = name.trim().length > 0 && specValid(spec);
+  const changed =
+    name.trim() !== policy.name ||
+    description.trim() !== policy.description ||
+    JSON.stringify(spec) !== JSON.stringify(policy.spec);
+
+  return (
+    <>
+      <Drawer
+        title={policy.name}
+        sub={<PolicyTypeTag type={policy.type} plain />}
+        onClose={onClose}
+        footer={
+          <>
+            <button
+              className="btn btn--danger"
+              style={{ marginRight: "auto" }}
+              disabled={saving || removing}
+              onClick={() => setConfirmingDelete(true)}
+            >
+              <Icon name="trash" size={14} /> Delete
+            </button>
+            <button className="btn" onClick={onClose}>
+              {changed ? "Discard" : "Close"}
+            </button>
+            <button
+              className="btn btn--primary"
+              disabled={saving || !changed}
+              onClick={async () => {
+                setSubmitted(true);
+                if (!valid) return;
+                try {
+                  await save(policy.id, {
+                    name: name.trim(),
+                    description: description.trim(),
+                    spec,
+                    version: policy.version,
+                  });
+                } catch (err) {
+                  toast({
+                    tone: "deny",
+                    title: `${policy.name} was not saved`,
+                    body: err instanceof Error ? err.message : "The backend refused.",
+                  });
+                  return;
+                }
+                onClose();
+                toast({
+                  tone: "allow",
+                  title: `${name.trim()} saved`,
+                  body: policy.enabled
+                    ? "It is in force as edited. Running sessions pick it up straight away."
+                    : "It stays disabled until you enable it.",
+                });
+              }}
+            >
+              {saving ? "Saving…" : "Save changes"}
+            </button>
+          </>
+        }
+      >
+        {policy.enabled && (
+          <div className="callout callout--info" style={{ marginBottom: 16 }}>
+            This policy is enabled. Saving changes what it does for everyone it applies to, straight away.
+          </div>
+        )}
+        <Field label="Name" error={submitted && !name.trim() ? "Give the policy a name." : null}>
+          <input className="input" value={name} onChange={(e) => setName(e.target.value)} />
+        </Field>
+        <Field label="Description" hint="Why it exists. The next administrator will need it.">
+          <textarea className="textarea" value={description} onChange={(e) => setDescription(e.target.value)} />
+        </Field>
+
+        <hr />
+
+        <SpecEditor spec={spec} onChange={setSpec} models={models} showErrors={submitted} advanced />
+
+        <hr />
+
+        <KV>
+          <Row k="Group">{groupName}</Row>
+          <Row k="Version">v{policy.version}</Row>
+          <Row k="Updated">{dateTime(policy.updatedAt)}</Row>
+          <Row k="Updated by">{dir.userName(policy.updatedBy)}</Row>
+          <Row k="Status">
+            {policy.enabled ? <Badge tone="allow">Enabled</Badge> : <Badge>Disabled</Badge>}
+          </Row>
+        </KV>
+      </Drawer>
+
+      {confirmingDelete && (
+        <ConfirmDialog
+          title={`Delete ${policy.name}?`}
+          body={
+            policy.enabled
+              ? `It is in force now. Deleting it stops it applying to everyone in ${groupName} straight away, and it cannot be undone — disabling it keeps it around instead.`
+              : "It cannot be undone. The change history keeps a record that it existed."
+          }
+          confirmLabel="Delete policy"
+          danger
+          busy={removing}
+          onClose={() => setConfirmingDelete(false)}
+          onConfirm={async () => {
+            try {
+              await remove(policy.id);
+            } catch (err) {
+              toast({
+                tone: "deny",
+                title: `${policy.name} was not deleted`,
+                body: err instanceof Error ? err.message : "The backend refused.",
+              });
+              return;
+            }
+            onClose();
+            toast({ tone: "warn", title: `${policy.name} deleted`, body: `Removed from ${groupName}.` });
+          }}
+        />
+      )}
+    </>
   );
 }

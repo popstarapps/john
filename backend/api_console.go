@@ -582,6 +582,60 @@ func (s *Server) handleCreatePolicy(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, http.StatusOK, policyJSON(p))
 }
 
+func (s *Server) handleUpdatePolicy(w http.ResponseWriter, r *http.Request) {
+	admin := s.requireAdmin(w, r)
+	if admin == nil {
+		return
+	}
+	var req struct {
+		Name        string          `json:"name"`
+		Description string          `json:"description"`
+		Spec        json.RawMessage `json:"spec"`
+		Version     int             `json:"version"` // the one the editor started from
+	}
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil || req.Name == "" || len(req.Spec) == 0 {
+		writeErr(w, http.StatusBadRequest, "name and spec are required")
+		return
+	}
+	p, err := s.store.UpdatePolicy(r.PathValue("id"), req.Name, req.Description, req.Spec, req.Version, admin.ID)
+	switch {
+	case errors.Is(err, store.ErrNotFound):
+		writeErr(w, http.StatusNotFound, "no such policy")
+		return
+	case errors.Is(err, store.ErrStalePolicy):
+		writeErr(w, http.StatusConflict, "someone else changed this policy since you opened it — reopen it to see their change")
+		return
+	case err != nil:
+		writeErr(w, http.StatusBadRequest, err.Error())
+		return
+	}
+	s.store.RecordChange(admin.ID, "policy", "updated", p.ID, p.Name, "Edited "+p.Name+".", &p.Version)
+	writeJSON(w, http.StatusOK, policyJSON(p))
+}
+
+func (s *Server) handleDeletePolicy(w http.ResponseWriter, r *http.Request) {
+	admin := s.requireAdmin(w, r)
+	if admin == nil {
+		return
+	}
+	p, err := s.store.DeletePolicy(r.PathValue("id"), admin.ID)
+	if errors.Is(err, store.ErrNotFound) {
+		writeErr(w, http.StatusNotFound, "no such policy")
+		return
+	}
+	if err != nil {
+		writeErr(w, http.StatusInternalServerError, err.Error())
+		return
+	}
+	groupName := p.GroupID
+	if g, err := s.store.PolicyGroupByID(p.GroupID); err == nil {
+		groupName = g.Name
+	}
+	s.store.RecordChange(admin.ID, "policy", "deleted", p.ID, p.Name,
+		"Deleted "+p.Type+" policy "+p.Name+" from "+groupName+".", nil)
+	writeJSON(w, http.StatusOK, map[string]bool{"ok": true})
+}
+
 func (s *Server) handleSetPolicyEnabled(w http.ResponseWriter, r *http.Request) {
 	admin := s.requireAdmin(w, r)
 	if admin == nil {

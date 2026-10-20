@@ -7,6 +7,7 @@ import (
 	"net/http"
 	"testing"
 	"testing/fstest"
+	"time"
 )
 
 // gzBytes gzip-compresses b, as `make release` does to each client binary.
@@ -127,5 +128,45 @@ func TestReleasesEmptyWhenNoneBundled(t *testing.T) {
 	}
 	if code := status(t, browser, base+"/releases/john-linux-amd64"); code != http.StatusNotFound {
 		t.Fatalf("download with nothing bundled = %d, want 404", code)
+	}
+}
+
+// A terminal has no browser session, so the download page hands out a link
+// that carries its own permission — for minutes, and only as minted.
+func TestReleaseDownloadLink(t *testing.T) {
+	fake := []byte("pretend binary")
+	clientsFS = fstest.MapFS{"john-linux-amd64.gz": {Data: gzBytes(fake)}}
+	t.Cleanup(func() { clientsFS = nil })
+
+	srv := testServerWithIdP(t)
+	base := "http://" + srv.Addr()
+
+	if code := status(t, http.DefaultClient, base+"/api/v1/releases/link"); code != http.StatusUnauthorized {
+		t.Fatalf("anonymous link = %d, want 401", code)
+	}
+
+	browser := browserClient(t)
+	resp, _ := browser.Get(base + "/auth/login")
+	resp.Body.Close()
+	var link struct{ Token string }
+	getJSON(t, browser, base+"/api/v1/releases/link", &link)
+
+	// Fetched with no session at all, as curl would.
+	dl, err := http.Get(base + "/releases/john-linux-amd64?t=" + link.Token)
+	if err != nil {
+		t.Fatal(err)
+	}
+	body, _ := io.ReadAll(dl.Body)
+	dl.Body.Close()
+	if dl.StatusCode != http.StatusOK || !bytes.Equal(body, fake) {
+		t.Fatalf("download with link = %d %q", dl.StatusCode, body)
+	}
+
+	expired, _ := newReleaseLink(time.Now().Add(-releaseLinkLife - time.Minute))
+	tampered := link.Token[:len(link.Token)-2] + "xx"
+	for name, tok := range map[string]string{"expired": expired, "tampered": tampered, "garbage": "nope"} {
+		if code := status(t, http.DefaultClient, base+"/releases/john-linux-amd64?t="+tok); code != http.StatusUnauthorized {
+			t.Fatalf("%s link = %d, want 401", name, code)
+		}
 	}
 }
